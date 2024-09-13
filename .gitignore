@@ -1,0 +1,6 @@
+.idea/
+__pycache__/
+app.db
+app/templates/index.html
+config.py
+myenv/
