@@ -103,16 +103,24 @@ def donate_money():
 def distribute_donations():
     form = DistributionForm()
     if not verify(form):  # invalid post or get request
-        money_donos = sa.select(Donation).where(
+        # Query to get money donations
+        money_donos = db.session.query(Donation).filter(
             and_(
                 Donation.distribution_status == False,
-                Donation.donation_type == 'dollar')).order_by(Donation.donation_date.desc())
-        item_donos = sa.select(Donation).where(
+                Donation.donation_type == 'dollar'
+            )
+        ).order_by(Donation.donation_date.desc()).all()
+
+        # Query to get item donations
+        item_donos = db.session.query(Donation).filter(
             and_(
                 Donation.distribution_status == False,
-                Donation.donation_type != 'dollar')).order_by(Donation.donation_date.desc())
-        #TODO add pagination
-        return render_template('distribute_donations.html', form=form, money_donos= money_donos, item_donos=item_donos)
+                Donation.donation_type != 'dollar'
+            )
+        ).order_by(Donation.donation_date.desc()).all()
+        # TODO: Add pagination
+        # Render the template with the fetched results
+        return render_template('distribute_donations.html', form=form, money_donos=money_donos, item_donos=item_donos)
     else:
         selected_donations = request.form.getlist('donation_id')
         selected_donations_data = Donation.query.filter(Donation.id.in_(selected_donations)).all()
