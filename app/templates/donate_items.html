@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <body>
+    <div class="container mt-4">
+        <h1 class="mb-4">Record Item Donation</h1>
+        <form action="{{ url_for('donate_items') }}" method="POST">
+            {{ form.hidden_tag() }} <!-- CSRF protection -->
+
+            <!-- Donation Type Field -->
+            <div class="form-group">
+                {{ form.donation_type.label(class="form-label") }}<br>
+                {{ form.donation_type(class="form-control", required=true) }}
+                {% if form.donation_type.errors %}
+                <div class="text-danger mt-2">
+                    {% for error in form.donation_type.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Description Field -->
+            <div class="form-group">
+                {{ form.description.label(class="form-label") }}<br>
+                {{ form.description(class="form-control") }}
+                {% if form.description.errors %}
+                <div class="text-danger mt-2">
+                    {% for error in form.description.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Quantity Field -->
+            <div class="form-group">
+                {{ form.quantity.label(class="form-label") }}<br>
+                {{ form.quantity(class="form-control", min=1, required=true) }}
+                {% if form.quantity.errors %}
+                <div class="text-danger mt-2">
+                    {% for error in form.quantity.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Donor Name Field -->
+            <div class="form-group">
+                {{ form.donor_name.label(class="form-label") }}<br>
+                {{ form.donor_name(class="form-control", required=true) }}
+                {% if form.donor_name.errors %}
+                <div class="text-danger mt-2">
+                    {% for error in form.donor_name.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Donation Date Field -->
+            <div class="form-group">
+                {{ form.donation_date.label(class="form-label") }}<br>
+                {{ form.donation_date(class="form-control", type="date") }}
+                {% if form.donation_date.errors %}
+                <div class="text-danger mt-2">
+                    {% for error in form.donation_date.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary">Donate</button>
+        </form>
+    </div>
+{% endblock %}

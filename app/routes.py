@@ -1,12 +1,17 @@
+
 from urllib.parse import urlsplit
 
 from flask_login import current_user, login_user, logout_user, login_required
+from sqlalchemy import func, and_, select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import app, db, login
 from flask import render_template, flash, redirect, url_for, request, jsonify
 from app.models import Donation, User
-from app.forms import LoginForm
+from app.forms import LoginForm, ItemDonationForm, FinancialDonationForm, DistributionForm
 import sqlalchemy as sa
+
+from app.utils import verify
 
 @app.route('/')
 @app.route('/index')
@@ -42,42 +47,132 @@ def login():
     return render_template('login.html', title='Sign In', form=form)
 
 # Route to add a new donation
-@app.route('/add_donation', methods=['POST'])
-def add_donation():
-    data = request.get_json()
-    donor_name = data.get('donor_name')
-    donation_type = data.get('donation_type')
-    item_description = data.get('item_description', None)
-    quantity = data.get('quantity', None)
-    amount = data.get('amount', None)
+@app.route('/donate_items', methods=['GET', 'POST'])
+@login_required
+def donate_items():
+    form = ItemDonationForm()
+    if not verify(form): #invalid post or get request
+        return render_template('donate_items.html', form=form)
+    else: #Valid post, update state
+        new_donation = Donation(
+            donation_type=form.donation_type.data,
+            item_description=form.description.data,
+            quantity=form.quantity.data,
+            donor_name=form.donor_name.data,
+            donation_date=form.donation_date.data,
+            distribution_status=False
+        )
+        try:
+            db.session.add(new_donation)
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            app.logger.error(f"An error occurred: {e}")
+            return "An error occurred while processing your request.", 500
+        flash('Thank you for your donation!', 'success')
+        return redirect(url_for('donate_items'))  # Redirect after successful donation
 
-    # Validation for donation type
-    if donation_type not in ['item', 'dollar']:
-        return jsonify({'error': 'Invalid donation type'}), 400
-
-    # Create a new Donation record
-    new_donation = Donation(
-        donor_name=donor_name,
-        donation_type=donation_type,
-        item_description=item_description,
-        quantity=quantity,
-        amount=amount
-    )
-    db.session.add(new_donation)
-    db.session.commit()
-
-    return jsonify(new_donation.to_dict()), 201
+# Route to add a new donation
+@app.route('/donate_money', methods=['GET', 'POST'])
+@login_required
+def donate_money():
+    form = FinancialDonationForm()
+    if not verify(form):  # invalid post or get request
+        return render_template('donate_money.html', form=form)
+    else: #add donation
+        new_donation = Donation(
+            donation_type='dollar',
+            amount=form.amount.data,
+            donor_name=form.donor_name.data,
+            donation_date=form.donation_date.data,
+            distribution_status=False
+        )
+        try:
+            db.session.add(new_donation)
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            app.logger.error(f"An error occurred: {e}")
+            return "An error occurred while processing your request.", 500
+        flash('Thank you for your donation!', 'success')
+        return redirect(url_for('donate_money'))  # Redirect after successful donation
 
 # Route to get all donations
-@app.route('/donations', methods=['GET'])
-def get_donations():
-    donations = Donation.query.all()
-    return jsonify([donation.to_dict() for donation in donations])
+@app.route('/distribute_donations', methods=['GET', 'POST'])
+@login_required
+def distribute_donations():
+    form = DistributionForm()
+    if not verify(form):  # invalid post or get request
+        money_donos = sa.select(Donation).where(
+            and_(
+                Donation.distribution_status == False,
+                Donation.donation_type == 'dollar')).order_by(Donation.donation_date.desc())
+        item_donos = sa.select(Donation).where(
+            and_(
+                Donation.distribution_status == False,
+                Donation.donation_type != 'dollar')).order_by(Donation.donation_date.desc())
+        #TODO add pagination
+        return render_template('distribute_donations.html', form=form, money_donos= money_donos, item_donos=item_donos)
+    else:
+        selected_donations = request.form.getlist('donation_id')
+        selected_donations_data = Donation.query.filter(Donation.id.in_(selected_donations)).all()
+        for donation in selected_donations_data:
+            donation.distribution_status = True
+        db.session.commit()
 
-# Route to get a specific donation by ID
-@app.route('/donations/<int:donation_id>', methods=['GET'])
-def get_donation(donation_id):
-    donation = Donation.query.get(donation_id)
-    if donation is None:
-        return jsonify({'error': 'Donation not found'}), 404
-    return jsonify(donation.to_dict())
+        # Process the selected donations
+        print(f'Selected donations: {selected_donations}')
+        return redirect(url_for('distribute_donations'))  # Redirect after successful donation
+
+# Route to get all donations
+@app.route('/inventory_report', methods=['GET'])
+@login_required
+def inventory_report():
+    item_donations = db.session.query(
+        Donation.donation_type,
+        Donation.distribution_status,
+        func.sum(Donation.quantity).label('total_quantity')
+    ).filter(
+        Donation.donation_type != 'dollar'
+    ).group_by(
+        Donation.donation_type,
+        Donation.distribution_status
+    ).order_by(
+        Donation.donation_type,
+        Donation.distribution_status
+    ).all()
+    money_donations = db.session.query(
+        Donation.distribution_status,
+        func.sum(Donation.amount).label('total_amount')
+    ).filter(
+        Donation.donation_type == 'dollar'
+    ).group_by(
+        Donation.donation_type,
+        Donation.distribution_status
+    ).order_by(
+        Donation.donation_type,
+        Donation.distribution_status
+    ).all()
+
+    db.session.close()
+    return render_template('inventory_report.html', item_donations=item_donations, money_donations=money_donations)
+
+@app.route('/donor_report', methods=['GET'])
+@login_required
+def donor_report():
+    donations = db.session.query(
+        Donation.donor_name,
+        Donation.donation_type,
+        func.sum(Donation.quantity).label('total_quantity'),
+        func.sum(Donation.amount).label('total_amount')
+    ).group_by(
+        Donation.donor_name,
+        Donation.donation_type
+    ).order_by(
+        Donation.donor_name,
+        Donation.donation_type,
+    ).all()
+
+
+    db.session.close()
+    return render_template('donor_report.html', donations=donations)
