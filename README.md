@@ -1,17 +1,20 @@
 # Shelter Prototype
 
 ## About the Prototype
-Hello! Thanks for reviewing this code. I decided to try out Flask, a framework I had never developed with before. I hope this demonstrates my ability to learn and contribute to a project quickly.
+Hello! Thanks for reviewing this code.
+This project makes use of Flask, SQLLite and Bootstrap. 
+I decided to try out Flask, a framework I had never developed with before. I hope this demonstrates my ability to learn and contribute to a project quickly.
 
 I used code from [Miguel Grinberg's Flask Mega-Tutorial](https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-ix-pagination) and ChatGPT as references.
+I focused on the APIs and database, leaving the styling to minimal Bootstrap CSS.
 
-The prototype is more or less complete. I focused on the APIs and database, leaving the styling to minimal Bootstrap CSS.
 
 ### Future Improvements:
+- Ability to build an offline report PDF (with a message queue and workers)
+- Caching
 - Tests
 - Complete UI and styling (including better verification of inputs)
-- Pagination on reports
-- Ability to build an offline report PDF
+- Pagination on online reports
 - User registration and management
 - Docker
 
